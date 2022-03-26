@@ -1,0 +1,74 @@
+pipeline{
+  agent any 
+  tools{
+    maven "maven3.8.5"
+  }
+  stages{
+    stage('1.clone'){
+      steps{
+            sh "echo clonning the latest version of the code" 
+            git credentialsId: 'GITHUB-CREDENTIAL-dev', url: 'https://github.com/landmark-zell/maven-web-app.git'
+            sh "echo clonning successful"
+      }
+    }
+    stage('2.Build'){
+      steps{
+        sh "echo validation, compilation, testing and package"
+        sh "echo testing successful and ready to package"
+        sh "mvn clean package"
+      }
+    }
+    stage('3.Quality'){
+      steps{
+        sh "echo performing code quality analysis"
+        sh "echo code quality successful and ready to upload"
+        sh "mvn sonar:sonar"
+      }
+    }
+  stage('4.uploadArtifacts'){
+      steps{
+        sh "echo uploading artifacts to nexus"
+        sh "echo artifacts successfully uploaded"
+        sh "mvn deploy"
+      }
+    }
+  stage('5.Deploy2UAT'){
+      steps{
+        sh "echo DEPLOYING TO UAT for further testing and validation"
+        deploy adapters: [tomcat9(credentialsId: 'tomcat credential', path: '', url: 'http://18.222.67.148:8080/')], contextPath: null, onFailure: false, war: 'target/*.war'
+       // sh "scp -o StrictHostKeyChecking=no target/*.war ec2-user@172.31.89.218:/opt/tomcat9/webapps/boaapp.war"
+      }
+    }
+    stage('6.Deploy2Prod'){
+      steps{
+        sh "echo DEPLOYING application TO Production"
+        timeout(time:8, unit:'HOURS'){
+        input message: 'Please approve deployment to Production'
+      }
+   deploy adapters: [tomcat9(credentialsId: 'tomcat credential', path: '', url: 'http://18.222.67.148:8080/')], contextPath: null, onFailure: false, war: 'target/*.war'
+   //     sh "scp -o StrictHostKeyChecking=no target/*.war ec2-user@172.31.89.218:/opt/tomcat9/webapps/boaapp.war"
+       }
+     }
+    }
+     post{
+         always{
+             mail bcc: 'rogernanjoh@gmail.com', body: '''hello all
+application delivered and the client is happy
+regards
+noela''', cc: 'dohnoela59@gmail.com', from: '', replyTo: '', subject: 'success', to: 'dohnoela59@gmail.com'
+         }
+         success{
+            mail bcc: 'dohnoela59@gmail.com', body: '''hello all
+application delivered and the client is happy
+regards
+noela''', cc: 'dohnoela59@gmail.com', from: '', replyTo: '', subject: 'success', to: 'dohnoela59@gmail.com' 
+         }
+         failure{
+            mail bcc: 'dohnoela59@gmail.com', body: '''hello all
+            application not deployed
+regards
+noela''', cc: 'dohnoela59@gmail.com', from: '', replyTo: '', subject: 'failure', to: 'dohnoela59@gmail.com' 
+         }
+     
+         }
+        }
